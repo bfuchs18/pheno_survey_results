@@ -1,0 +1,278 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# SFARI Phenotypic Data – Researcher Feedback Survey Results
+
+Setup
+
+```{r setup, echo=FALSE, message = FALSE}
+#install.packages("table1")
+library(table1)
+library(ggplot2)
+library(tidyverse)
+# loads data as survey
+source("scripts/setup.R")
+
+# subset data
+coding <- survey[survey$share_coding_preferences_check == "Yes",]
+
+knitr::opts_chunk$set(
+  fig.width = 10,
+  fig.height = 6,
+  fig.align = "center",
+  dpi = 300
+)
+```
+
+
+## Overall Experience
+
+Sample
+```{r Overall Experience Sample, echo=FALSE}
+```
+
+Plot of Data Value Coding Challenges
+```{r Data Value Challenges Plot, echo=FALSE}
+
+# format data and values for barplot
+value_chal_long <- survey %>%
+  select(
+    "datachal_coding_ambig",
+    "datachal_coding_incon",
+    "datachal_coding_incompat",
+    "datachal_null_ambig"
+  ) %>%
+  pivot_longer(cols = everything(),
+               names_to = "Question",
+               values_to = "Response") %>%
+  mutate(
+    Question = recode(
+      Question,
+      "datachal_coding_ambig" = "Codes were ambiguous or undefined",
+      "datachal_coding_incon" = "Codes were inconsistent within a dataset",
+      "datachal_coding_incompat" = "Codes were incompatible with how I needed them for analyses",
+      "datachal_null_ambig" = "Sources of missing data (null values) were ambiguous"
+    )
+  ) %>%
+  # wrap strings for better formatting in plot
+  mutate(Question = str_wrap(Question, width = 20)) %>%
+  mutate(Response = str_wrap(Response, width = 40))
+  
+# Create grouped bar chart
+value_chal_plot <-
+  ggplot(value_chal_long, aes(x = Question, fill = Response)) +
+  geom_bar(position = "dodge") +
+  scale_fill_brewer(palette = "Dark2", na.value = "grey80") +
+  labs(y = "Count of Responses", x = "Value Coding Issue") +
+  theme_minimal(base_size = 12) +
+  theme(plot.background = element_rect(
+    color = "black",
+    fill = NA,
+    linewidth = 1.0
+  ))
+
+
+value_chal_plot_export <- value_chal_plot + theme(
+    axis.text.x = element_text(color = "black", size = 16),
+    axis.title.x = element_text(size = 18, face = "bold"),
+    axis.title.y = element_text(size = 18, face = "bold"),  
+    legend.key.height = unit(1.5, "cm"),
+    # Increase space between legend items vertically, bold "this cause challenges for me"
+    legend.text = element_text(
+      color = "black"
+    )
+  )
+  
+# export for slides
+ggsave("plots/value_chal_plot.png", width = 16, height = 8, plot = value_chal_plot_export, dpi = 1200, bg = "white")
+
+value_chal_plot # display with settings set in setup
+
+```
+
+```{r value coding challenge elaborations}
+
+## these comments were manually identified as being related to value coding
+survey$challenge_other_describe[survey$timestamp %in% c("4/17/2025 17:08:47", "4/30/2025 15:37:08")]
+
+
+```
+
+## Coding Preferences
+
+```{r describe sample}
+
+#### describe sample ####
+
+# where those who responded to the coding different than those who didnt?
+table1(
+  x = ~ education + n_pheno_datasets + processing_proficiency + compiled_pheno_role_hands_on| share_coding_preferences_check, 
+  data = survey
+)
+
+table1(
+  x = ~ education + current_role + compiled_pheno_role_hands_on, 
+  data = coding
+)
+
+# project roles -- figure out a better way to display and summarize this 
+role_items <- grep("pheno_roles_", names(coding), value = TRUE)
+coding %>%
+  select(all_of(role_items)) %>%
+  pivot_longer(cols = everything(), names_to = "tool", values_to = "selected") %>%
+  filter(selected == "yes") %>%
+  count(tool) %>%
+  ggplot(aes(x = reorder(tool, -n), y = n)) +
+  geom_col(fill = "steelblue") +
+  labs(x = "Role with data", y = "Count", title = "Number of Participants Selecting Each Role")
+
+
+## software tools -- figure out a better way to display and summarize this 
+tool_labels <- c(
+  "proc_tool_excel_automate" = "Excel Adv",
+  "proc_tool_excel_basic" = "Excel Basic",
+  "proc_tool_sas" = "SAS",
+  "proc_tool_stata" = "Stata",
+  "proc_tool_r" = "R",
+  "proc_tool_spss" = "SPSS",
+  "proc_tool_python" = "Python",
+  "proc_tool_jupyter" = "Jupyter Notebook"
+)
+proc_tools_items <- grep("proc_tool", names(coding), value = TRUE)
+coding %>%
+  select(all_of(proc_tools_items)) %>%
+  pivot_longer(cols = everything(), names_to = "tool", values_to = "selected") %>%
+  filter(selected == "yes") %>%
+  count(tool) %>%
+  ggplot(aes(x = reorder(tool, -n), y = n)) +
+  geom_col(fill = "steelblue") +
+  labs(x = "Processing Tool", y = "Count", title = "Number of Participants Selecting Each Processing Tool") +
+  scale_x_discrete(labels = tool_labels) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# count excel alone
+sum(
+  coding$proc_tool_excel_basic == "yes" &
+    coding$proc_tool_excel_automate == "no" &
+    coding$proc_tool_r == "no" &
+    coding$proc_tool_python == "no" &
+    coding$proc_tool_spss == "no" &
+    coding$proc_tool_stata == "no" &
+    coding$proc_tool_sas == "no"
+)
+
+# count basic excel + SPSS only
+sum(
+  coding$proc_tool_excel_basic == "yes" &
+    coding$proc_tool_excel_automate == "no" &
+    coding$proc_tool_r == "no" &
+    coding$proc_tool_python == "no" &
+    coding$proc_tool_spss == "yes" &
+    coding$proc_tool_stata == "no" &
+    coding$proc_tool_sas == "no"
+)
+
+# count basic excel + stata only 
+sum(
+  coding$proc_tool_excel_basic == "yes" &
+    coding$proc_tool_excel_automate == "no" &
+    coding$proc_tool_r == "no" &
+    coding$proc_tool_python == "no" &
+    coding$proc_tool_spss == "no" &
+    coding$proc_tool_stata == "yes" &
+    coding$proc_tool_sas == "no"
+)
+
+# count basic excel + programming 
+sum(
+  coding$proc_tool_excel_basic == "yes" &
+    (coding$proc_tool_excel_automate == "yes" |
+      coding$proc_tool_r == "yes" |
+    coding$proc_tool_python == "yes" | coding$proc_tool_sas == "yes")
+)
+
+# frequency of responses for processing_proficiency 
+barplot(table(coding$n_pheno_datasets), main = "Frequency: Number of pheno datasets pre-SFARI")
+
+# frequency of responses for processing_proficiency 
+barplot(table(coding$processing_proficiency), main = "Frequency: How proficient are you (1-5)")
+```
+
+```{r coding subset}
+
+coding_red <- coding[grep("^coding|role|processing_proficiency|^proc_tool", names(coding))]
+
+```
+
+```{r coding boolean results}
+
+barplot(table(coding$coding_boolean), main = "Preference for boolean value codes")
+
+coding$coding_boolean_describe[coding$coding_boolean %in% c("4", "5") & !is.na(coding$coding_boolean_describe)]
+
+coding$coding_boolean_describe[coding$coding_boolean %in% c("1", "2") & !is.na(coding$coding_boolean_describe)]
+
+coding$coding_boolean_describe[coding$coding_boolean == "3" & !is.na(coding$coding_boolean_describe)]
+```
+
+```{r coding nominal results}
+
+barplot(table(coding$coding_nominal), main = "Preference for nomical categorical")
+
+coding$coding_nominal_describe[coding$coding_nominal %in% c("4", "5") & !is.na(coding$coding_nominal_describe)]
+
+coding$coding_nominal_describe[coding$coding_nominal %in% c("1", "2") & !is.na(coding$coding_nominal_describe)]
+
+coding$coding_nominal_describe[coding$coding_nominal == "3" & !is.na(coding$coding_nominal_describe)]
+
+```
+
+```{r coding ordinal results}
+
+barplot(table(coding$coding_ordinal), main = "Preference for ordinal categorical")
+
+coding$coding_ordinal_describe[coding$coding_ordinal %in% c("4", "5") & !is.na(coding$coding_ordinal_describe)]
+
+coding$coding_ordinal_describe[coding$coding_ordinal %in% c("1", "2") & !is.na(coding$coding_ordinal_describe)]
+
+coding$coding_ordinal_describe[coding$coding_ordinal == "3" & !is.na(coding$coding_ordinal_describe)]
+
+```
+
+```{r coding special response results}
+
+barplot(table(coding$coding_dk_pna), main = "Preference for special cases")
+
+coding$coding_dk_pna_describe[coding$coding_dk_pna %in% c("4", "5") & !is.na(coding$coding_dk_pna_describe)]
+
+coding$coding_dk_pna_describe[coding$coding_dk_pna %in% c("1", "2") & !is.na(coding$coding_dk_pna_describe)]
+
+coding$coding_dk_pna_describe[coding$coding_dk_pna == "3" & !is.na(coding$coding_dk_pna_describe)]
+
+```
+
+```{r coding skipped results}
+
+barplot(table(coding$coding_skipped), main = "Preference for skipped")
+
+coding$coding_skipped_describe[coding$coding_skipped %in% c("4", "5") & !is.na(coding$coding_skipped_describe)]
+
+coding$coding_skipped_describe[coding$coding_skipped %in% c("1", "2") & !is.na(coding$coding_skipped_describe)]
+
+coding$coding_skipped_describe[coding$coding_skipped == "3" & !is.na(coding$coding_skipped_describe)]
+
+```
+
+```{r coding checklist results}
+
+barplot(table(coding$coding_checklists), main = "Preference for checklists")
+
+coding$coding_checklists_describe[coding$coding_checklists_describe == "checked = 1; unchecked = 0 or null depending on context" & !is.na(coding$coding_checklists_describe)]
+
+coding$coding_checklists_describe[coding$coding_checklists_describe == "checked = 1; unchecked = 0" & !is.na(coding$coding_checklists_describe)]
+
+coding$coding_checklists_describe[coding$coding_checklists_describe == "checked = 1; unchecked = null"  & !is.na(coding$coding_checklists_describe)]
+```
