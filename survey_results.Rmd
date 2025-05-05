@@ -9,10 +9,11 @@ editor_options:
 Setup
 
 ```{r setup, echo=FALSE, message = FALSE}
-#install.packages("table1")
+
 library(table1)
 library(ggplot2)
 library(tidyverse)
+
 # loads data as survey
 source("scripts/setup.R")
 
@@ -32,6 +33,48 @@ knitr::opts_chunk$set(
 
 Sample
 ```{r Overall Experience Sample, echo=FALSE}
+
+table1(
+  x = ~ education + current_role + n_pheno_datasets + compiled_pheno_role_hands_on,
+  data = survey
+)
+
+role_items <- grep("pheno_roles_", names(survey), value = TRUE)
+survey %>%
+  select(all_of(role_items)) %>%
+  pivot_longer(cols = everything(), names_to = "tool", values_to = "selected") %>%
+  filter(selected == "yes") %>%
+  count(tool) %>%
+  ggplot(aes(x = reorder(tool, -n), y = n)) +
+  geom_col(fill = "steelblue") +
+  labs(x = "Role with data", y = "Count", title = "Number of Participants Selecting Each Role")
+
+barplot(table(survey$n_pheno_datasets), main = "Prior to working with SFARI phenotypic data,\n how many other phenotypic datasets\n had you worked with?", ylab = "Count", xlab = "Number of datasets")
+
+```
+
+```{r Combining sfari pheno data, echo=FALSE}
+barplot(table(survey$combined_sfari_pheno),
+        main = "Have you ever combined phenotypic data \nacross multiple SFARI cohorts? \n(e.g., merged questionnaire data between SPARK and SSC)", ylab = "Count")
+
+combine_pheno_table <- as.data.frame(xtabs(formula = ~combined_sfari_pheno + combined_sfari_pheno_text, data = survey)) %>%
+  pivot_wider(
+    id_cols = combined_sfari_pheno_text,
+    names_from = combined_sfari_pheno,
+    values_from = Freq
+  )  %>%
+  rename("combination" = combined_sfari_pheno_text)
+
+barplot(table(survey$combined_sfari_nonsfari),
+        main = "Have you ever combined SFARI phenotypic data\n with data collected outside the Simons Foundation?\n (e.g., combined SPARK and NDAR data)", ylab = "Count")
+
+combine_sfarinonsfari_table <- as.data.frame(xtabs(formula = ~combined_sfari_nonsfari + combined_sfari_nonsfari_text, data = survey)) %>%
+  pivot_wider(
+    id_cols = combined_sfari_nonsfari_text,
+    names_from = combined_sfari_nonsfari,
+    values_from = Freq
+  )  %>%
+  rename("combination" = combined_sfari_nonsfari_text)
 ```
 
 Plot of Data Value Coding Challenges

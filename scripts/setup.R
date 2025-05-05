@@ -13,6 +13,31 @@ survey <- survey[survey$pheno_check == "Yes",]
 
 #### clean up ####
 
+##### combining sets free-text #####
+
+survey$combined_sfari_pheno_text <-
+  ifelse(
+    survey$combined_sfari_pheno_text %in% c(
+      "SSC and SPARK",
+      "SPARK and SSC to get a mix of the various phenotypic data"
+    ),
+    "SPARK and SSC",
+    ifelse(
+      survey$combined_sfari_pheno_text %in% c(
+        "Maximal cross-collaboration! ",
+        "not sure",
+        "no specific plans -- just seems likely to be relevant in future",
+        "Ideally, all datasets could be easily and reliably combined.",
+        "N/A"
+      ),
+      NA,
+      survey$combined_sfari_pheno_text
+    )
+  )
+
+
+##### levels #####
+
 preference_levels <- c("1", "2", "3", "4", "5")
 survey$coding_boolean <- factor(survey$coding_boolean, levels = preference_levels)
 survey$coding_nominal <- factor(survey$coding_nominal, levels = preference_levels)
