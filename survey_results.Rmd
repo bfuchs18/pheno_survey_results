@@ -17,6 +17,7 @@ library(tidyverse)
 # loads data as survey
 source("scripts/setup.R")
 
+
 # subset data
 coding <- survey[survey$share_coding_preferences_check == "Yes",]
 
@@ -34,8 +35,12 @@ knitr::opts_chunk$set(
 Sample
 ```{r Overall Experience Sample, echo=FALSE}
 
+# prep labels for table1
+label(survey$edu_clean) <- "Highest Degree of Education"
+label(survey$current_role) <- "Current Role"
+
 table1(
-  x = ~ education + current_role + n_pheno_datasets + compiled_pheno_role_hands_on,
+  x = ~ edu_clean + current_role + compiled_pheno_role_primary_hands_on,
   data = survey
 )
 
@@ -57,23 +62,33 @@ barplot(table(survey$n_pheno_datasets), main = "Prior to working with SFARI phen
 barplot(table(survey$combined_sfari_pheno),
         main = "Have you ever combined phenotypic data \nacross multiple SFARI cohorts? \n(e.g., merged questionnaire data between SPARK and SSC)", ylab = "Count")
 
-combine_pheno_table <- as.data.frame(xtabs(formula = ~combined_sfari_pheno + combined_sfari_pheno_text, data = survey)) %>%
-  pivot_wider(
-    id_cols = combined_sfari_pheno_text,
-    names_from = combined_sfari_pheno,
-    values_from = Freq
-  )  %>%
+combine_pheno_table <-
+  as.data.frame(xtabs(
+    formula = ~ combined_sfari_pheno + combined_sfari_pheno_text,
+    data = survey
+  )) %>%
+  pivot_wider(id_cols = combined_sfari_pheno_text,
+              names_from = combined_sfari_pheno,
+              values_from = Freq)  %>%
   rename("combination" = combined_sfari_pheno_text)
+
+
+
+
 
 barplot(table(survey$combined_sfari_nonsfari),
         main = "Have you ever combined SFARI phenotypic data\n with data collected outside the Simons Foundation?\n (e.g., combined SPARK and NDAR data)", ylab = "Count")
 
-combine_sfarinonsfari_table <- as.data.frame(xtabs(formula = ~combined_sfari_nonsfari + combined_sfari_nonsfari_text, data = survey)) %>%
-  pivot_wider(
-    id_cols = combined_sfari_nonsfari_text,
-    names_from = combined_sfari_nonsfari,
-    values_from = Freq
-  )  %>%
+combine_sfarinonsfari_table <-
+  as.data.frame(
+    xtabs(
+      formula = ~ combined_sfari_nonsfari + combined_sfari_nonsfari_text,
+      data = survey
+    )
+  ) %>%
+  pivot_wider(id_cols = combined_sfari_nonsfari_text,
+              names_from = combined_sfari_nonsfari,
+              values_from = Freq)  %>%
   rename("combination" = combined_sfari_nonsfari_text)
 ```
 
@@ -148,29 +163,19 @@ survey$challenge_other_describe[survey$timestamp %in% c("4/17/2025 17:08:47", "4
 
 ```{r describe sample}
 
+
+
 #### describe sample ####
 
-# where those who responded to the coding different than those who didnt?
-table1(
-  x = ~ education + n_pheno_datasets + processing_proficiency + compiled_pheno_role_hands_on| share_coding_preferences_check, 
-  data = survey
-)
+label(coding$edu_clean) <- "Highest Degree of Education"
+label(coding$current_role) <- "Current Role"
+
+label(coding$compiled_pheno_role_primary_hands_on) <- "Experience in primary hands-on role"
 
 table1(
-  x = ~ education + current_role + compiled_pheno_role_hands_on, 
+  x = ~ edu_clean + current_role + compiled_pheno_role_primary_hands_on, 
   data = coding
 )
-
-# project roles -- figure out a better way to display and summarize this 
-role_items <- grep("pheno_roles_", names(coding), value = TRUE)
-coding %>%
-  select(all_of(role_items)) %>%
-  pivot_longer(cols = everything(), names_to = "tool", values_to = "selected") %>%
-  filter(selected == "yes") %>%
-  count(tool) %>%
-  ggplot(aes(x = reorder(tool, -n), y = n)) +
-  geom_col(fill = "steelblue") +
-  labs(x = "Role with data", y = "Count", title = "Number of Participants Selecting Each Role")
 
 
 ## software tools -- figure out a better way to display and summarize this 
@@ -186,6 +191,18 @@ tool_labels <- c(
 )
 proc_tools_items <- grep("proc_tool", names(coding), value = TRUE)
 coding %>%
+  select(all_of(proc_tools_items)) %>%
+  pivot_longer(cols = everything(), names_to = "tool", values_to = "selected") %>%
+  filter(selected == "yes") %>%
+  count(tool) %>%
+  ggplot(aes(x = reorder(tool, -n), y = n)) +
+  geom_col(fill = "steelblue") +
+  labs(x = "Processing Tool", y = "Count", title = "Number of Participants Selecting Each Processing Tool") +
+  scale_x_discrete(labels = tool_labels) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+proc_tools_items <- grep("proc_tool", names(survey), value = TRUE)
+survey %>%
   select(all_of(proc_tools_items)) %>%
   pivot_longer(cols = everything(), names_to = "tool", values_to = "selected") %>%
   filter(selected == "yes") %>%
@@ -237,6 +254,20 @@ sum(
     coding$proc_tool_python == "yes" | coding$proc_tool_sas == "yes")
 )
 
+# % programming - coding sample
+sum(
+    (coding$proc_tool_excel_automate == "yes" |
+      coding$proc_tool_r == "yes" |
+    coding$proc_tool_python == "yes" | coding$proc_tool_sas == "yes")
+) / nrow(coding)
+
+# % programming - larger sample
+sum(
+    (survey$proc_tool_excel_automate == "yes" |
+      survey$proc_tool_r == "yes" |
+    survey$proc_tool_python == "yes" | survey$proc_tool_sas == "yes"), na.rm = TRUE
+) / nrow(survey)
+
 # frequency of responses for processing_proficiency 
 barplot(table(coding$n_pheno_datasets), main = "Frequency: Number of pheno datasets pre-SFARI")
 
@@ -254,10 +285,13 @@ coding_red <- coding[grep("^coding|role|processing_proficiency|^proc_tool", name
 
 barplot(table(coding$coding_boolean), main = "Preference for boolean value codes")
 
+# pro string explanations
 coding$coding_boolean_describe[coding$coding_boolean %in% c("4", "5") & !is.na(coding$coding_boolean_describe)]
 
+# pro-int explanations
 coding$coding_boolean_describe[coding$coding_boolean %in% c("1", "2") & !is.na(coding$coding_boolean_describe)]
 
+# neutral explanations
 coding$coding_boolean_describe[coding$coding_boolean == "3" & !is.na(coding$coding_boolean_describe)]
 ```
 
@@ -265,10 +299,13 @@ coding$coding_boolean_describe[coding$coding_boolean == "3" & !is.na(coding$codi
 
 barplot(table(coding$coding_nominal), main = "Preference for nomical categorical")
 
+# pro string explanations
 coding$coding_nominal_describe[coding$coding_nominal %in% c("4", "5") & !is.na(coding$coding_nominal_describe)]
 
+# pro-int explanations
 coding$coding_nominal_describe[coding$coding_nominal %in% c("1", "2") & !is.na(coding$coding_nominal_describe)]
 
+# neutral explanations
 coding$coding_nominal_describe[coding$coding_nominal == "3" & !is.na(coding$coding_nominal_describe)]
 
 ```
@@ -277,10 +314,13 @@ coding$coding_nominal_describe[coding$coding_nominal == "3" & !is.na(coding$codi
 
 barplot(table(coding$coding_ordinal), main = "Preference for ordinal categorical")
 
+# pro string explanations
 coding$coding_ordinal_describe[coding$coding_ordinal %in% c("4", "5") & !is.na(coding$coding_ordinal_describe)]
 
+# pro-int explanations
 coding$coding_ordinal_describe[coding$coding_ordinal %in% c("1", "2") & !is.na(coding$coding_ordinal_describe)]
 
+# neutral
 coding$coding_ordinal_describe[coding$coding_ordinal == "3" & !is.na(coding$coding_ordinal_describe)]
 
 ```
@@ -289,10 +329,13 @@ coding$coding_ordinal_describe[coding$coding_ordinal == "3" & !is.na(coding$codi
 
 barplot(table(coding$coding_dk_pna), main = "Preference for special cases")
 
+# pro string explanations
 coding$coding_dk_pna_describe[coding$coding_dk_pna %in% c("4", "5") & !is.na(coding$coding_dk_pna_describe)]
 
+# pro int explanations
 coding$coding_dk_pna_describe[coding$coding_dk_pna %in% c("1", "2") & !is.na(coding$coding_dk_pna_describe)]
 
+# neutral
 coding$coding_dk_pna_describe[coding$coding_dk_pna == "3" & !is.na(coding$coding_dk_pna_describe)]
 
 ```
@@ -301,10 +344,13 @@ coding$coding_dk_pna_describe[coding$coding_dk_pna == "3" & !is.na(coding$coding
 
 barplot(table(coding$coding_skipped), main = "Preference for skipped")
 
+# pro-code
 coding$coding_skipped_describe[coding$coding_skipped %in% c("4", "5") & !is.na(coding$coding_skipped_describe)]
 
+# pro-null
 coding$coding_skipped_describe[coding$coding_skipped %in% c("1", "2") & !is.na(coding$coding_skipped_describe)]
 
+# neutral
 coding$coding_skipped_describe[coding$coding_skipped == "3" & !is.na(coding$coding_skipped_describe)]
 
 ```
