@@ -1,6 +1,6 @@
 
 #### import ####
-file = "data/responses_2025-05-05.csv"
+file = "data/responses_2025-05-11.csv"
 survey <- read.csv(file, na.strings = "")
 survey_colnames <- read.csv("data/survey_colnames.csv")
 print(paste("using data from", file))
@@ -35,6 +35,32 @@ survey$combined_sfari_pheno_text <-
     )
   )
 
+survey <- survey %>%
+  mutate(combined_sfari_pheno_text =
+           case_when(combined_sfari_pheno_text == "SSC and SPARK"  ~ "SPARK and SSC",
+                     str_detect(combined_sfari_pheno_text, 'SPARK and SSC to get a mix')  ~ "SPARK and SSC",
+                     str_detect(combined_sfari_pheno_text, 'Maximal cross-collaboration|not sure|no specific plans| Ideally, all datasets|N/A')  ~ NA,
+                     str_detect(combined_sfari_pheno_text, 'Across Research Match datasets')  ~ "SPARK and SSC; across RM",
+                     str_detect(combined_sfari_pheno_text, 'Simons Searchlight, SSC, AIC')  ~ "Searchlight, SSC, AIC",
+                     str_detect(combined_sfari_pheno_text, 'SPARK, searchlight')  ~ "SPARK and Searchlight",
+                     str_detect(combined_sfari_pheno_text, 'would like to look into')  ~ "SPARK and SSC; would like to SPARK and Searchlight",
+                     T ~ combined_sfari_pheno_text))
+
+survey <- survey %>%
+  mutate(combined_sfari_nonsfari_text =
+           case_when(str_detect(combined_sfari_nonsfari_text, 'other research studies at Marcus') ~ "SPARK and Marcus/Emory",
+                     str_detect(combined_sfari_nonsfari_text, 'so gnarly') ~ "SSC, NDAR, ASC",
+                     str_detect(combined_sfari_nonsfari_text, 'facilitated several investigators') ~ "Searchlight and data from investigators and consortium groups (e.g., COMBINEDBrain)",
+                     str_detect(combined_sfari_nonsfari_text, 'SPARK with my NET webcam database')  ~ "SPARK and investigaor webcam database",
+                     str_detect(combined_sfari_nonsfari_text, 'my own data based on interviews with SPARK participants')  ~ "SPARK and investigator interview data",
+                     str_detect(combined_sfari_nonsfari_text, 'everything I can')  ~ "everything I can",
+                     str_detect(combined_sfari_nonsfari_text, 'Simons Searchlight and Citizen Health')  ~ "Searchlight and Citizen Health",
+                     str_detect(combined_sfari_nonsfari_text, 'cohorts at Cardiff University, UCLA and Emory')  ~ "SFARI and cohorts at Cardiff University, UCLA and Emory",
+                     str_detect(combined_sfari_nonsfari_text, 'Simons Searchlight, SSC, AIC & NDAR')  ~ "Searchlight, SSC, AIC & NDAR",
+                     combined_sfari_nonsfari_text == "no"  ~ NA,
+                     str_detect(combined_sfari_nonsfari_text, 'not yet')  ~ NA,
+                     T ~ combined_sfari_nonsfari_text))
+
 
 ##### levels #####
 
@@ -64,8 +90,10 @@ survey$pheno_roles_ra <- as.factor(ifelse(grepl("Research Assistant", survey$phe
 
 # create compiled var
 survey$compiled_pheno_role_hands_on <- ifelse(
-  grepl("Determined which datasets|Primary person who managed or processed raw data|conducted analyses|Research Assistant", survey$pheno_roles), "yes", "no")
+  grepl("Primary person who managed or processed raw data|conducted analyses|Research Assistant", survey$pheno_roles), "yes", "no")
 
+survey$compiled_pheno_role_primary_hands_on <- ifelse(
+  grepl("Primary person who managed or processed raw data|conducted analyses", survey$pheno_roles), "yes", "no")
 
 ## pheno roles checklist
 survey$proc_tool_excel_basic <- as.factor(ifelse(grepl("manual editing", survey$processing_tools), "yes", ifelse(is.na(survey$processing_tools), NA, "no")))
@@ -89,11 +117,8 @@ survey$proc_tool_matlab <- as.factor(ifelse(grepl("Matlab|matlab", survey$proces
 survey$degree_field <- tolower(survey$degree_field)
 
 # education 
-### change values / levels
-### reorder
+survey$edu_clean <- ifelse(grepl("MD, MPH", survey$education), "Professional degree (e.g., MD, JD, DDS)", survey$education)
+edu_clean_levels <- c("Bachelor's degree", "Masters's degree", "Doctoral degree (e.g., PhD)", "Professional degree (e.g., MD, JD, DDS)")
+survey$edu_clean <- factor(survey$edu_clean, levels=edu_clean_levels)
 
-# re-order levels
-#education_levels <- c("Bachelor's degree", "Masters's degree", "Doctoral degree (e.g., PhD)", "Professional degree (e.g., MD, JD, DDS)")
-#n_datasets_levels <- c("0 (SFARI phenotypic data was my first)", "1-2", "3-5", "10+")
 
-#survey$education <- factor(survey$education, levels=education_levels)
