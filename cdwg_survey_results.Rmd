@@ -6,6 +6,8 @@ editor_options:
 
 # SFARI Phenotypic Data – Researcher Feedback Survey Results
 
+Results shared at CDWG - focus on coding preferences
+
 Setup
 
 ```{r setup, echo=FALSE, message = FALSE}
@@ -14,9 +16,9 @@ library(table1)
 library(ggplot2)
 library(tidyverse)
 
-# loads data as survey
+# load data as survey
 source("scripts/setup.R")
-
+survey <- setup()$data
 
 # subset data
 coding <- survey[survey$share_coding_preferences_check == "Yes",]
