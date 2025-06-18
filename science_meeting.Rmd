@@ -1,0 +1,96 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+Code for Science Meeting Presentation on July 2, 2025
+```{r setup, echo=FALSE, message = FALSE}
+
+library(table1)
+library(ggplot2)
+library(tidyverse)
+
+# loads data as survey
+source("scripts/setup.R")
+output <- setup()
+survey <- output$data
+metadata <- output$metadata[c("name", "Question")]
+```
+
+# Sample
+
+# Challenges
+
+```{r plotting function}
+
+# TO DO -- make it so ## Data Combining category colors match the others (since there is an extra response option)
+
+create_challenges_plot <- function(plot_variables, title) {
+  
+  level_questions_by_challenges <- function(data_long) {
+    order <- data_long %>%
+      group_by(Question, Response) %>%
+      mutate(n = n()) %>%
+      distinct() %>%
+      filter(Response == "This caused challenges for me") %>%
+      arrange(desc(n)) %>%
+      ungroup() %>%
+      select(Question) %>%
+      pull()
+    
+    # Apply order to levels
+    data_long <- data_long %>%
+      mutate(Question = factor(Question, levels = order))
+    
+    return(data_long)
+  }
+  
+  # format data and values for barplot
+  data_long <- survey %>%
+    select(all_of(plot_variables)) %>%
+    pivot_longer(cols = everything(),
+                 names_to = "name",
+                 values_to = "Response") %>%
+    left_join(metadata, by = "name") %>%
+    # wrap strings for better formatting in plot
+    mutate(Question = str_wrap(Question, width = 20)) %>%
+    mutate(Response = str_wrap(Response, width = 40)) %>%
+    level_questions_by_challenges() # function defined above
+  
+  # Create grouped bar chart
+  plot <-
+    ggplot(data_long, aes(x = Question, fill = Response)) +
+    geom_bar(position = "dodge") +
+    scale_fill_brewer(palette = "Dark2", na.value = "grey80") +
+    labs(y = "Count of Responses", x = title) +
+    theme_minimal(base_size = 12) +
+    theme(plot.background = element_rect(
+      color = "black",
+      fill = NA,
+      linewidth = 1.0
+    ))
+  
+  return(plot)
+}
+
+```
+
+```{r create challenge plots}
+
+## Documentation and Metadata
+meta_vars <- grep("^metachal", names(survey), value = TRUE)
+create_challenges_plot(meta_vars, "Documentation and Metadata Challenge")
+
+## Data label and values
+data_vars <- grep("^datachal", names(survey), value = TRUE)
+create_challenges_plot(data_vars, "Data Label and Value Challenge")
+
+## Data Combining 
+combine_vars <- grep("^combinechal", names(survey), value = TRUE)
+create_challenges_plot(combine_vars, "Data Combining Challenge")
+
+## Data Processing and Analysis Challenges
+procchal_vars <- grep("^procchal", names(survey), value = TRUE)
+create_challenges_plot(procchal_vars, "Data Processing and Analysis Challenge")
+```
