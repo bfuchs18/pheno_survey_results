@@ -2,8 +2,8 @@ This repo contains the code to generate tables and plots of [SFARI Phenotypic Da
 
 Files: 
 
-- [science_meeting.Rmd](science_meeting.Rmd): generates tables and charts presented during the Science Meeting (7.2.2025)
-- [cdwg_survey_results.Rmd](cdwg_survey_results.Rmd): generates tables and charts presented during the CDWG (5.12.25)
+- [science_meeting.Rmd](science_meeting.Rmd): generates tables and charts presented during the Science Meeting ([7.2.2025](https://docs.google.com/presentation/d/1jYTZHAtp3TzXjpyajUk3LD0btHpi6Qja6UmNbL2886M/edit?slide=id.p#slide=id.p)
+- [cdwg_survey_results.Rmd](cdwg_survey_results.Rmd): generates tables and charts presented during the CDWG ([5.12.25](https://docs.google.com/presentation/d/1Cdr-MK6GBPRdR7o8XaTI561gqUR5Hlrwf3TOY3nJptM/edit?slide=id.p#slide=id.p)
 - [scripts/setup.R](scripts/setup.R): cleans data, sourced by Rmds
 
 To execute either .Rmd:
