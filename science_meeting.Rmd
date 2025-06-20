@@ -20,20 +20,22 @@ metadata <- output$metadata[c("name", "Question")]
 
 # Sample
 
-# Challenges
-
+# Barriers and Challenges
 ```{r plotting function}
 
 # TO DO -- make it so ## Data Combining category colors match the others (since there is an extra response option)
 
-create_challenges_plot <- function(plot_variables, title) {
+create_plot <- function(df, plot_variables, x_title, metadata, plot_na = FALSE, response_to_sort = NULL, response_order = NULL) {
+  # response_to_sort is a string to order questions by
+  # response_order is a vector of responses e.g., c("This caused challenges for me", ....)
+  # metadata is DF with name and Question columns used to map variable name to "Question" for plotting
   
-  level_questions_by_challenges <- function(data_long) {
+  level_questions_by_response <- function(data_long) {
     order <- data_long %>%
       group_by(Question, Response) %>%
       mutate(n = n()) %>%
       distinct() %>%
-      filter(Response == "This caused challenges for me") %>%
+      filter(Response == response_to_sort) %>%
       arrange(desc(n)) %>%
       ungroup() %>%
       select(Question) %>%
@@ -47,7 +49,7 @@ create_challenges_plot <- function(plot_variables, title) {
   }
   
   # format data and values for barplot
-  data_long <- survey %>%
+  data_long <- df %>%
     select(all_of(plot_variables)) %>%
     pivot_longer(cols = everything(),
                  names_to = "name",
@@ -55,21 +57,46 @@ create_challenges_plot <- function(plot_variables, title) {
     left_join(metadata, by = "name") %>%
     # wrap strings for better formatting in plot
     mutate(Question = str_wrap(Question, width = 20)) %>%
-    mutate(Response = str_wrap(Response, width = 40)) %>%
-    level_questions_by_challenges() # function defined above
+    mutate(Response = str_wrap(Response, width = 40)) 
   
-  # Create grouped bar chart
-  plot <-
-    ggplot(data_long, aes(x = Question, fill = Response)) +
-    geom_bar(position = "dodge") +
-    scale_fill_brewer(palette = "Dark2", na.value = "grey80") +
-    labs(y = "Count of Responses", x = title) +
+  if (!missing(response_to_sort)) { 
+    data_long <- level_questions_by_response(data_long) # function defined above
+  }
+
+  if (!plot_na) { 
+    data_long <- data_long %>% 
+      filter(!is.na(Response))
+  }
+  
+  if (!missing(response_order)) { 
+    data_long <- data_long %>%
+      mutate(Response = factor(Response, levels = response_order))
+  }
+  
+  # create summary data for plotting
+  data_summary <- data_long %>%
+    group_by(Question, Response) %>%
+    summarise(n = n(), .groups = "drop") %>%
+    # Make sure all combinations exist -- this will ensure "bars" with 0 counts still added to graph
+    complete(Question, Response, fill = list(n = 0)) %>%
+    # calculate percents to add to plot
+    group_by(Question) %>%
+    mutate(pct = n / sum(n) * 100)
+
+  # Create grouped bar chart -- plot n but print %
+  plot <- ggplot(data_summary, aes(x = Question, y = n, fill = Response)) +
+    geom_bar(stat = "identity", position = position_dodge(width = 0.9)) +
+    geom_text(aes(label = paste0(round(pct, 1), "%")),
+              position = position_dodge(width = 0.9),
+              vjust = -0.3, size = 3.5) +
+   # scale_fill_brewer(palette = "Dark2", na.value = "grey80") +
+    labs(y = "Count of Responses", x = x_title) +
     theme_minimal(base_size = 12) +
     theme(plot.background = element_rect(
       color = "black",
       fill = NA,
       linewidth = 1.0
-    ))
+  ))
   
   return(plot)
 }
@@ -78,19 +105,127 @@ create_challenges_plot <- function(plot_variables, title) {
 
 ```{r create challenge plots}
 
+challenge_response_order = c(
+  "This caused challenges for me",
+  "I noticed this but it wasn't an issue\nfor me",
+  "I did not notice this issue/this wasn't\nan issue with the dataset"
+)
+
 ## Documentation and Metadata
 meta_vars <- grep("^metachal", names(survey), value = TRUE)
-create_challenges_plot(meta_vars, "Documentation and Metadata Challenge")
+create_plot(
+  survey,
+  meta_vars,
+  "Documentation and Metadata Challenge",
+  metadata = metadata,
+  response_to_sort = "This caused challenges for me",
+  response_order = challenge_response_order
+)
 
 ## Data label and values
 data_vars <- grep("^datachal", names(survey), value = TRUE)
-create_challenges_plot(data_vars, "Data Label and Value Challenge")
+create_plot(
+  survey,
+  data_vars,
+  "Data Label and Value Challenge",
+  metadata = metadata,
+  response_to_sort = "This caused challenges for me",
+  response_order = challenge_response_order
+)
 
 ## Data Combining 
 combine_vars <- grep("^combinechal", names(survey), value = TRUE)
-create_challenges_plot(combine_vars, "Data Combining Challenge")
+create_plot(
+  survey,
+  combine_vars,
+  "Data Combining Challenge",
+  metadata = metadata,
+  response_to_sort = "This caused challenges for me",
+  response_order = challenge_response_order
+)
 
 ## Data Processing and Analysis Challenges
 procchal_vars <- grep("^procchal", names(survey), value = TRUE)
-create_challenges_plot(procchal_vars, "Data Processing and Analysis Challenge")
+create_plot(
+  survey,
+  procchal_vars,
+  "Data Processing and Analysis Challenge",
+  metadata = metadata,
+  response_to_sort = "This caused challenges for me",
+  response_order = challenge_response_order
+)
+
+```
+
+```{r barrier plots}
+barrier_vars <- c("barrier_modifying_var", "barrier_combining_data", "barrier_interpreting")
+create_plot(survey,
+            barrier_vars,
+            "Data Processing and Analysis Challenge",
+            metadata = metadata,
+            response_to_sort = "This was a barrier I faced",
+            response_order = c("This was a barrier I faced", "This was not a barrier I faced")
+)
+```
+
+```{r free text}
+
+challenge_text <- as.data.frame(survey$challenge_other_describe[!is.na(survey$challenge_other_describe)])
+
+barrier_text <- as.data.frame(survey$barrier_other_describe[!is.na(survey$barrier_other_describe)])
+
+best_repo_text <- as.data.frame(survey$best_repo_describe[!is.na(survey$best_repo_describe)])
+```
+
+# Supplemental Features
+```{r plots}
+supp_vars <- c("supp_welcomepacket", "supp_releasenotes", "supp_dd", "supp_flags")
+create_plot(
+  survey,
+  supp_vars,
+  "Supplemental Features",
+  metadata = metadata,
+  response_to_sort = "Very helpful",
+  response_order = c("I didn't know this existed",
+                     "I knew this existed but didn't use it",
+                     "Unhelpful",
+                     "Somewhat helpful",
+                     "Very helpful")
+)
+
+
+useful_vars <- c("useful_code", "useful_softwaretips", "useful_analytic_guidance", "useful_integration_tools", "useful_data_mapping", "useful_data_explore_viz", "useful_standardized_varname", "useful_standardized_coding")
+
+survey_recode <- survey %>%
+  mutate(across(all_of(useful_vars), ~ case_when(
+    .x == "Not applicable to my research" ~ "Not applicable or useful",
+    .x == "Not useful" ~ "Not applicable or useful",
+    .x == "Somewhat useful" ~ "Somewhat or very useful",
+    .x == "Very useful" ~ "Somewhat or very useful",
+    TRUE    ~ as.character(.x)  # keep other values as-is
+  )))
+
+# make Question more legible for plotting
+metadata_rev <- metadata %>%
+  mutate(Question = case_when(
+    name == "useful_code" ~ "Example code",
+    name == "useful_softwaretips" ~ "Software tips",
+    name == "useful_analytic_guidance" ~ "Analytic guidance",
+    name == "useful_integration_tools" ~ "Tools for data integration",
+    name == "useful_data_mapping" ~ "Data mapping guidelines",
+    name == "useful_standardized_varname" ~ "Standardized variable names",
+    name == "useful_standardized_coding" ~ "Standardized value codes",    
+    TRUE ~ Question  # keep other values as-is
+    ))
+
+create_plot(
+  survey_recode,
+  useful_vars,
+  "Potential feature",
+  metadata = metadata_rev,
+  response_to_sort = "Somewhat or very useful",
+  response_order = c("Somewhat or very useful", "Not applicable or useful")
+)
+
+
 ```
