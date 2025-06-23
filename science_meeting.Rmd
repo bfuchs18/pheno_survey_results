@@ -10,25 +10,24 @@ Code for Science Meeting Presentation on July 2, 2025
 library(table1)
 library(ggplot2)
 library(tidyverse)
+library(treemap)
 
 # loads data as survey
 source("scripts/setup.R")
-output <- setup()
+output <- setup(responses_file = "data/responses_2025-05-11.csv")
 survey <- output$data
 metadata <- output$metadata[c("name", "Question")]
 ```
 
-# Sample
-
-# Barriers and Challenges
 ```{r plotting function}
 
 # TO DO -- make it so ## Data Combining category colors match the others (since there is an extra response option)
 
-create_plot <- function(df, plot_variables, x_title, metadata, plot_na = FALSE, response_to_sort = NULL, response_order = NULL) {
-  # response_to_sort is a string to order questions by
+create_plot <- function(df, plot_variables, x_title, metadata, plot_na = FALSE, response_to_sort = NULL, response_order = NULL, variable_order = NULL) {
+  # response_to_sort is a string that indicates which response to order questions by on the x-axis. should not be used if variable_order is set
   # response_order is a vector of responses e.g., c("This caused challenges for me", ....)
   # metadata is DF with name and Question columns used to map variable name to "Question" for plotting
+  # DOESNT EXIST: variable_order is a vector that indicates what order variables should appear on the x-axis. should not be used if response_to_sort is set. will override response_to_sort
   
   level_questions_by_response <- function(data_long) {
     order <- data_long %>%
@@ -102,6 +101,127 @@ create_plot <- function(df, plot_variables, x_title, metadata, plot_na = FALSE, 
 }
 
 ```
+
+# Sample
+
+```{r sample}
+# prep labels for table1
+label(survey$edu_clean) <- "Highest Degree of Education"
+label(survey$current_role) <- "Current Role"
+
+# table: highest degree ----
+table1(
+  x = ~ edu_clean,
+  data = survey
+)
+
+# bar plot: degree field ----
+degree_field_plot <- survey %>%
+  count(degree_field_cleaned) %>% # count occurrences
+  ggplot(aes(x = reorder(degree_field_cleaned,-n), y = n)) + # reorder factor by count descending
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(x = "Degree Field",
+       y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 55, hjust = 1, size = 12),
+        axis.text.y = element_text(size = 12))
+
+degree_field_plot
+
+
+
+
+# tree map of current role ----
+role_tree_map <- survey %>%
+  mutate(
+    # assign role_group
+    role_group = case_when(
+      grepl("Professor", current_role) ~ "Professor",
+      grepl("Simons|Research Assistant", current_role) ~ "Research Adjacent",
+      grepl("student|trainee|Student|Postdoctoral|fellow", current_role) ~ "Student/Fellow",
+      grepl("Industry|Government|Scientist|Clinician-Researcher", current_role ) ~ "Non-professor researcher",
+      TRUE ~ NA_character_
+    ), 
+    
+    # clean up current_role
+    current_role = case_when(
+      grepl("Clinician-Researcher", current_role) ~ "Clinician-Researcher",
+      grepl("Research Assistant", current_role) ~ "Research Assistant (staff)",
+      grepl("Doctoral Student", current_role) ~ "Doctoral Student",
+      TRUE ~ current_role
+    )
+  )  %>%
+  select(role_group, current_role) %>%
+  group_by(role_group, current_role) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  treemap(
+    .,
+    index = c("role_group", "current_role"),
+    vSize = "n",
+    type = "index",
+    fontsize.labels=c(0,50))
+
+role_tree_map
+
+
+# table1(
+#   x = ~ edu_clean + compiled_pheno_role_primary_hands_on,
+#   data = survey
+# )
+
+
+# roles with SFARI pheno datasets ----
+role_items <- grep("pheno_roles_", names(survey), value = TRUE)
+barplot_data_roles <- survey %>%
+  select(all_of(role_items)) %>%
+  pivot_longer(cols = everything(),
+               names_to = "tool",
+               values_to = "selected") %>%
+  filter(selected == "yes") %>%
+  count(tool) %>%
+  ggplot(aes(x = reorder(tool,-n), y = n)) +
+  geom_col(fill = "steelblue") +
+  labs(x = "Role", y = "Count", title = "Roles when working with SFARI Pheno data (select all that apply)") +
+  scale_x_discrete(
+    labels = c(
+      "pheno_roles_pi" = "PI",
+      "pheno_roles_coi" = "Co-I",
+      "pheno_roles_determine_data" = "Determined which datasets \nor variables were relevant \nfor analyses",
+      "pheno_roles_process" = "Managed or processed \ndata (primary person)",
+      "pheno_roles_analyses" = "Conducted analyses \n(primary person)",
+      "pheno_roles_ra" = "RA (assisted with data \nprocessing or analyses)"
+    )) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 55, hjust = 1, size = 12),
+    axis.text.y = element_text(size = 12)
+  )
+
+barplot_data_roles
+
+# number of pheno datasets ----
+
+## TO DO: remake with GGPLOT, fix axis labels 
+barplot(table(survey$n_pheno_datasets), main = "Prior to working with SFARI phenotypic data,\n how many other phenotypic datasets\n had you worked with?", ylab = "Count", xlab = "Number of datasets")
+
+```
+
+```{r combining datasets}
+combining_data_vars <- c("combined_sfari_pheno", "combined_sfari_pheno_nonpheno", "combined_sfari_nonsfari")
+
+create_plot(
+  survey,
+  combining_data_vars,
+  metadata = metadata,
+  "Combination", 
+  response_order = c("Yes", "No, but I would like to", "No, and I don't plan to", "I tried to and it didn't work"), 
+  variable_order = combining_data_vars
+    
+)
+
+```
+
+# Barriers and Challenges
 
 ```{r create challenge plots}
 
