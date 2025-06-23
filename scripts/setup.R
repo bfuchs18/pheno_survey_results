@@ -6,7 +6,7 @@ setup <- function(responses_file = "data/responses_2025-05-11.csv", colnames_fil
   
   survey <- read.csv(responses_file, na.strings = "")
   survey_colnames <- read.csv(colnames_file)
-  print(paste("using data from", file))
+  print(paste("using data from", responses_file))
   
   # set col names
   names(survey) <- survey_colnames$name
@@ -15,6 +15,25 @@ setup <- function(responses_file = "data/responses_2025-05-11.csv", colnames_fil
   survey <- survey[survey$pheno_check == "Yes",]
   
   #### clean up ####
+  
+  ##### degree field #####
+  
+  survey <- survey %>%
+    mutate(
+      degree_field_cleaned = str_to_title(degree_field),
+      degree_field_cleaned =
+        case_when(
+          str_detect(degree_field_cleaned, '^Medical|^Medicine')  ~ "Medicine",
+          str_detect(degree_field_cleaned, '^Genetics|^Genomics')  ~ "Genetics, Genomics",
+          
+          # abbreviate for plot
+          str_detect(degree_field_cleaned, 'Computer Science')  ~ gsub("Computer Science", "Comp Sci", degree_field_cleaned),
+          str_detect(degree_field_cleaned, 'Developmental Biology')  ~ gsub("Developmental Biology", "Dev. Biology", degree_field_cleaned),
+          
+          T ~ str_to_title(degree_field)
+        )
+      #degree_field_cleaned = gsub("and", "&", degree_field_cleaned),
+    )
   
   ##### combining sets free-text #####
   
