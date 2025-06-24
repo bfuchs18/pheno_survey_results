@@ -54,22 +54,39 @@ create_plot <- function(df, plot_variables, x_title, metadata, plot_na = FALSE, 
                  names_to = "name",
                  values_to = "Response") %>%
     left_join(metadata, by = "name") %>%
-    # wrap strings for better formatting in plot
-    mutate(Question = str_wrap(Question, width = 20)) %>%
-    mutate(Response = str_wrap(Response, width = 40)) 
+    
+    # wrap strings for better formatting in plot, if not already have /n formatting
+    mutate(Question = ifelse(!grepl("\n", Question), str_wrap(Question, width = 20), Question),
+           Response = ifelse(!grepl("\n", Response), str_wrap(Response, width = 40), Response)
+           )
   
+  # impacts variable order on x-axis
   if (!missing(response_to_sort)) { 
     data_long <- level_questions_by_response(data_long) # function defined above
   }
 
-  if (!plot_na) { 
+  # impacts whether missing responses are included in plot
+    if (!plot_na) { 
     data_long <- data_long %>% 
       filter(!is.na(Response))
   }
   
+  # impacts legend order
   if (!missing(response_order)) { 
     data_long <- data_long %>%
       mutate(Response = factor(Response, levels = response_order))
+  }
+  
+  # impacts variable order on x-axis (will overwrite changes from response_to_sort)
+  if (!missing(variable_order)) {
+    
+    # look up corresponding Question value based on variable names
+    lookup_vector <- setNames(metadata$Question, metadata$name)
+    mapped_vector <- lookup_vector[variable_order]
+    
+    # set order
+    data_long <- data_long %>%
+      mutate(Question = factor(Question, levels = mapped_vector))
   }
   
   # create summary data for plotting
@@ -88,14 +105,16 @@ create_plot <- function(df, plot_variables, x_title, metadata, plot_na = FALSE, 
     geom_text(aes(label = paste0(round(pct, 1), "%")),
               position = position_dodge(width = 0.9),
               vjust = -0.3, size = 3.5) +
-   # scale_fill_brewer(palette = "Dark2", na.value = "grey80") +
+    # scale_fill_brewer(palette = "Dark2", na.value = "grey80") +
     labs(y = "Count of Responses", x = x_title) +
     theme_minimal(base_size = 12) +
-    theme(plot.background = element_rect(
-      color = "black",
-      fill = NA,
-      linewidth = 1.0
-  ))
+    theme(
+      plot.background = element_rect(
+        color = "black",
+        fill = NA,
+        linewidth = 1.0
+      )
+    )
   
   return(plot)
 }
@@ -209,10 +228,20 @@ barplot(table(survey$n_pheno_datasets), main = "Prior to working with SFARI phen
 ```{r combining datasets}
 combining_data_vars <- c("combined_sfari_pheno", "combined_sfari_pheno_nonpheno", "combined_sfari_nonsfari")
 
+metadata_formatted <- metadata %>%
+  mutate(
+    Question = case_when(
+      name == "combined_sfari_pheno" ~ "SFARI pheno + \nSFARI pheno",
+      name == "combined_sfari_pheno_nonpheno" ~ "SFARI pheno + \nSFARI non-pheno",
+      name == "combined_sfari_nonsfari" ~ "SFARI pheno + \nnon-SFARI pheno",
+      TRUE ~ Question
+    )
+  )
+
 create_plot(
   survey,
   combining_data_vars,
-  metadata = metadata,
+  metadata = metadata_formatted,
   "Combination", 
   response_order = c("Yes", "No, but I would like to", "No, and I don't plan to", "I tried to and it didn't work"), 
   variable_order = combining_data_vars
