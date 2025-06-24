@@ -102,6 +102,13 @@ setup <- function(responses_file = "data/responses_2025-05-11.csv", colnames_fil
   ndataset_levels <- c("0", "1-2", "3-5", "6-10", "10+")
   survey$n_pheno_datasets <- factor(survey$n_pheno_datasets, levels = ndataset_levels)
   
+  ## datasets worked with checklist
+  survey$worked_with_spark <- as.factor(ifelse(grepl("SPARK", survey$data_worked_with), "yes", ifelse(is.na(survey$data_worked_with), NA, "no")))
+  survey$worked_with_ssc <- as.factor(ifelse(grepl("SSC", survey$data_worked_with), "yes", ifelse(is.na(survey$data_worked_with), NA, "no")))
+  survey$worked_with_rm <- as.factor(ifelse(grepl("Research Match", survey$data_worked_with, fixed = TRUE), "yes", ifelse(is.na(survey$data_worked_with), NA, "no")))
+  survey$worked_with_searchlight <- as.factor(ifelse(grepl("Searchlight", survey$data_worked_with), "yes", ifelse(is.na(survey$data_worked_with), NA, "no")))
+  survey$worked_with_aic <- as.factor(ifelse(grepl("AIC", survey$data_worked_with), "yes", ifelse(is.na(survey$data_worked_with), NA, "no")))
+  
   ## pheno roles checklist
   survey$pheno_roles_pi <- as.factor(ifelse(grepl("Principal Investigator", survey$pheno_roles), "yes", ifelse(is.na(survey$pheno_roles), NA, "no")))
   survey$pheno_roles_coi <- as.factor(ifelse(grepl("Co-investigator", survey$pheno_roles), "yes", ifelse(is.na(survey$pheno_roles), NA, "no")))
@@ -143,6 +150,7 @@ setup <- function(responses_file = "data/responses_2025-05-11.csv", colnames_fil
   edu_clean_levels <- c("Bachelor's degree", "Masters's degree", "Doctoral degree (e.g., PhD)", "Professional degree (e.g., MD, JD, DDS)")
   survey$edu_clean <- factor(survey$edu_clean, levels=edu_clean_levels)
 
+  
   return(list(
     data = survey,
     metadata = survey_colnames
