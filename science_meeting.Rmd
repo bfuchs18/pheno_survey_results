@@ -54,34 +54,41 @@ create_plot <- function(df, plot_variables, x_title, metadata, plot_na = FALSE, 
                  names_to = "name",
                  values_to = "Response") %>%
     left_join(metadata, by = "name") %>%
-    
-    # wrap strings for better formatting in plot, if not already have /n formatting
-    mutate(Question = ifelse(!grepl("\n", Question), str_wrap(Question, width = 20), Question),
-           Response = ifelse(!grepl("\n", Response), str_wrap(Response, width = 40), Response)
-           )
+     
+    # wrap strings for better formatting in plot
+    mutate(Question = str_wrap(Question, width = 20),
+           Response = str_wrap(Response, width = 40))
   
-  # impacts variable order on x-axis
-  if (!missing(response_to_sort)) { 
-    data_long <- level_questions_by_response(data_long) # function defined above
-  }
 
   # impacts whether missing responses are included in plot
-    if (!plot_na) { 
-    data_long <- data_long %>% 
+  if (!plot_na) {
+    print(paste("plot_na:", plot_na))
+    data_long <- data_long %>%
       filter(!is.na(Response))
   }
   
   # impacts legend order
   if (!missing(response_order)) { 
+      print(paste("response_order:", response_order))
+    
     data_long <- data_long %>%
-      mutate(Response = factor(Response, levels = response_order))
+      ### apply str_wrap to match formatting applied to Response above
+      mutate(Response = factor(Response, levels = str_wrap(response_order, width = 40)))
+  }
+  
+  # impacts variable order on x-axis
+  if (!missing(response_to_sort)) { 
+      print(paste("response_to_sort:", response_to_sort))
+    data_long <- level_questions_by_response(data_long) # function defined above
   }
   
   # impacts variable order on x-axis (will overwrite changes from response_to_sort)
   if (!missing(variable_order)) {
+    print(paste("variable_order:", variable_order))
     
     # look up corresponding Question value based on variable names
-    lookup_vector <- setNames(metadata$Question, metadata$name)
+    ### apply str_wrap to match formatting applied to Response above
+    lookup_vector <- setNames(str_wrap(metadata$Question, width = 20), metadata$name)
     mapped_vector <- lookup_vector[variable_order]
     
     # set order
@@ -91,6 +98,8 @@ create_plot <- function(df, plot_variables, x_title, metadata, plot_na = FALSE, 
   
   # create summary data for plotting
   data_summary <- data_long %>%
+    
+    # summarize
     group_by(Question, Response) %>%
     summarise(n = n(), .groups = "drop") %>%
     # Make sure all combinations exist -- this will ensure "bars" with 0 counts still added to graph
@@ -123,12 +132,13 @@ create_plot <- function(df, plot_variables, x_title, metadata, plot_na = FALSE, 
 
 # Sample
 
-```{r sample}
-# prep labels for table1
-label(survey$edu_clean) <- "Highest Degree of Education"
-label(survey$current_role) <- "Current Role"
+```{r education, degree, current role}
 
 # table: highest degree ----
+
+# prep labels
+label(survey$edu_clean) <- "Highest Degree of Education"
+
 table1(
   x = ~ edu_clean,
   data = survey
@@ -182,25 +192,50 @@ role_tree_map <- survey %>%
 
 role_tree_map
 
+```
 
-# table1(
-#   x = ~ edu_clean + compiled_pheno_role_primary_hands_on,
-#   data = survey
-# )
+```{r pheno dataset experience}
 
+# bar plot: which SFARI datasets ----
+sfari_datasets_plot <- survey %>%
+  select(starts_with("worked_with")) %>%
+  pivot_longer(cols = everything(), names_to = "study", values_to = "selected") %>%
+  filter(selected == "yes") %>%
+  count(study) %>%
+  mutate(study = fct_reorder(study, n, .desc = TRUE),
+         pct = n/nrow(survey) * 100) %>%
+  ggplot(., aes(x = study, y = n)) +
+    geom_bar(stat = "identity", fill = "steelblue") +
+  labs(x = "Study", y = "Count", title = "SFARI pheno dataset(s) worked with (select all that apply)") +
+    theme_minimal() + 
+  scale_x_discrete(labels = c(
+    "worked_with_aic" = "AIC",
+    "worked_with_rm" = "Research Match",
+    "worked_with_searchlight" = "Searchlight",
+    "worked_with_spark" = "SPARK",
+    "worked_with_ssc" = "SSC"
+  )) + 
+  geom_text(aes(label = paste0(round(pct, 1), "%")),
+              position = position_dodge(width = 0.9),
+              vjust = -0.3, size = 3.5)
+
+sfari_datasets_plot
 
 # roles with SFARI pheno datasets ----
+## TO DO: add pct 
 role_items <- grep("pheno_roles_", names(survey), value = TRUE)
+
 barplot_data_roles <- survey %>%
   select(all_of(role_items)) %>%
-  pivot_longer(cols = everything(),
-               names_to = "tool",
-               values_to = "selected") %>%
+  pivot_longer(cols = everything(), names_to = "role", values_to = "selected") %>%
   filter(selected == "yes") %>%
-  count(tool) %>%
-  ggplot(aes(x = reorder(tool,-n), y = n)) +
-  geom_col(fill = "steelblue") +
-  labs(x = "Role", y = "Count", title = "Roles when working with SFARI Pheno data (select all that apply)") +
+  count(role) %>%
+  mutate(role = fct_reorder(role, n, .desc = TRUE),
+         pct = n/nrow(survey) * 100) %>%
+  ggplot(., aes(x = role, y = n)) +
+    geom_bar(stat = "identity", fill = "steelblue") +
+  labs(x = "role", y = "Count", title = "Role(s) when working with SFARI pheno dataset (select all that apply)") +
+  theme_minimal() + 
   scale_x_discrete(
     labels = c(
       "pheno_roles_pi" = "PI",
@@ -210,7 +245,9 @@ barplot_data_roles <- survey %>%
       "pheno_roles_analyses" = "Conducted analyses \n(primary person)",
       "pheno_roles_ra" = "RA (assisted with data \nprocessing or analyses)"
     )) +
-  theme_minimal() +
+  geom_text(aes(label = paste0(round(pct, 1), "%")),
+              position = position_dodge(width = 0.9),
+              vjust = -0.3, size = 3.5) +
   theme(
     axis.text.x = element_text(angle = 55, hjust = 1, size = 12),
     axis.text.y = element_text(size = 12)
@@ -240,12 +277,12 @@ metadata_formatted <- metadata %>%
 
 create_plot(
   survey,
-  combining_data_vars,
-  metadata = metadata_formatted,
-  "Combination", 
+  plot_variables = combining_data_vars,
+  metadata = metadata,
+  x_title = "Combination", 
   response_order = c("Yes", "No, but I would like to", "No, and I don't plan to", "I tried to and it didn't work"), 
   variable_order = combining_data_vars
-    
+
 )
 
 ```
@@ -253,12 +290,6 @@ create_plot(
 # Barriers and Challenges
 
 ```{r create challenge plots}
-
-challenge_response_order = c(
-  "This caused challenges for me",
-  "I noticed this but it wasn't an issue\nfor me",
-  "I did not notice this issue/this wasn't\nan issue with the dataset"
-)
 
 ## Documentation and Metadata
 meta_vars <- grep("^metachal", names(survey), value = TRUE)
@@ -268,18 +299,26 @@ create_plot(
   "Documentation and Metadata Challenge",
   metadata = metadata,
   response_to_sort = "This caused challenges for me",
-  response_order = challenge_response_order
+  response_order = c(
+    "This caused challenges for me",
+    "I noticed this but it wasn't an issue for me",
+    "I did not notice this issue/this wasn't an issue with the dataset"
+  )
 )
 
 ## Data label and values
 data_vars <- grep("^datachal", names(survey), value = TRUE)
 create_plot(
-  survey,
-  data_vars,
-  "Data Label and Value Challenge",
+  df = survey,
+  plot_variables = data_vars,
+  x_title = "Data Label and Value Challenge",
   metadata = metadata,
   response_to_sort = "This caused challenges for me",
-  response_order = challenge_response_order
+  response_order = c(
+    "This caused challenges for me",
+    "I noticed this but it didn't cause a challenge for me",
+    "I did not notice this issue/this wasn't an issue with the dataset"
+  )
 )
 
 ## Data Combining 
@@ -290,7 +329,12 @@ create_plot(
   "Data Combining Challenge",
   metadata = metadata,
   response_to_sort = "This caused challenges for me",
-  response_order = challenge_response_order
+  response_order = c(
+    "This caused challenges for me",
+    "I noticed this but it wasn't an issue for me",
+    "I did not notice this issue/this wasn't an issue with the dataset",
+    "NA - have not merged/combined datasets"
+  )
 )
 
 ## Data Processing and Analysis Challenges
@@ -301,7 +345,10 @@ create_plot(
   "Data Processing and Analysis Challenge",
   metadata = metadata,
   response_to_sort = "This caused challenges for me",
-  response_order = challenge_response_order
+  response_order = c(
+    "This caused challenges for me",
+    "I noticed this but it wasn't an issue for me",
+    "I did not notice this issue/this wasn't an issue with the dataset")
 )
 
 ```
