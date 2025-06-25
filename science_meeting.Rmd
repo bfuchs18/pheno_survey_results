@@ -57,35 +57,31 @@ create_plot <- function(df, plot_variables, x_title, metadata, plot_na = FALSE, 
      
     # wrap strings for better formatting in plot
     mutate(Question = str_wrap(Question, width = 20),
-           Response = str_wrap(Response, width = 40))
+           Response = str_wrap(Response, width = 35))
   
 
   # impacts whether missing responses are included in plot
   if (!plot_na) {
-    print(paste("plot_na:", plot_na))
     data_long <- data_long %>%
       filter(!is.na(Response))
   }
   
   # impacts legend order
   if (!missing(response_order)) { 
-      print(paste("response_order:", response_order))
     
     data_long <- data_long %>%
       ### apply str_wrap to match formatting applied to Response above
-      mutate(Response = factor(Response, levels = str_wrap(response_order, width = 40)))
+      mutate(Response = factor(Response, levels = str_wrap(response_order, width = 35)))
   }
   
   # impacts variable order on x-axis
   if (!missing(response_to_sort)) { 
-      print(paste("response_to_sort:", response_to_sort))
     data_long <- level_questions_by_response(data_long) # function defined above
   }
   
   # impacts variable order on x-axis (will overwrite changes from response_to_sort)
   if (!missing(variable_order)) {
-    print(paste("variable_order:", variable_order))
-    
+
     # look up corresponding Question value based on variable names
     ### apply str_wrap to match formatting applied to Response above
     lookup_vector <- setNames(str_wrap(metadata$Question, width = 20), metadata$name)
@@ -113,20 +109,30 @@ create_plot <- function(df, plot_variables, x_title, metadata, plot_na = FALSE, 
     geom_bar(stat = "identity", position = position_dodge(width = 0.9)) +
     geom_text(aes(label = paste0(round(pct, 1), "%")),
               position = position_dodge(width = 0.9),
-              vjust = -0.3, size = 3.5) +
+              vjust = -0.3, size = 5) +
     # scale_fill_brewer(palette = "Dark2", na.value = "grey80") +
     labs(y = "Count of Responses", x = x_title) +
-    theme_minimal(base_size = 12) +
+    theme_bw() +
     theme(
       plot.background = element_rect(
         color = "black",
         fill = NA,
         linewidth = 1.0
-      )
+      ),
+      text = element_text(color = "black", size = 18),
+      axis.text = element_text(color = "black", size = 14),
+      legend.title = element_text(color = "black", size = 18),
+      legend.text = element_text(color = "black", size = 14),
     )
   
   return(plot)
 }
+
+
+ggsave2 <- function(figure_path) {
+  ggsave(figure_path, width = 17, height = 8, bg = "white", dpi = 300)
+}
+
 
 ```
 
@@ -156,7 +162,7 @@ degree_field_plot <- survey %>%
         axis.text.y = element_text(size = 12))
 
 degree_field_plot
-
+ggsave2("figs/sample_field.png")
 
 
 
@@ -206,8 +212,8 @@ sfari_datasets_plot <- survey %>%
          pct = n/nrow(survey) * 100) %>%
   ggplot(., aes(x = study, y = n)) +
     geom_bar(stat = "identity", fill = "steelblue") +
-  labs(x = "Study", y = "Count", title = "SFARI pheno dataset(s) worked with (select all that apply)") +
-    theme_minimal() + 
+  labs(x = "Study (select all that apply)", y = "Count") +
+  theme_minimal() + 
   scale_x_discrete(labels = c(
     "worked_with_aic" = "AIC",
     "worked_with_rm" = "Research Match",
@@ -217,9 +223,15 @@ sfari_datasets_plot <- survey %>%
   )) + 
   geom_text(aes(label = paste0(round(pct, 1), "%")),
               position = position_dodge(width = 0.9),
-              vjust = -0.3, size = 3.5)
+              vjust = -0.3, size = 7) +
+  theme(
+    text = element_text(color = "black", size = 20),
+    axis.text.x = element_text(size = 18, colour = "black"),
+    axis.text.y = element_text(size = 18, colour = "black")
+  )
 
 sfari_datasets_plot
+ggsave2("figs/sample_datasets.png")
 
 # roles with SFARI pheno datasets ----
 ## TO DO: add pct 
@@ -234,7 +246,7 @@ barplot_data_roles <- survey %>%
          pct = n/nrow(survey) * 100) %>%
   ggplot(., aes(x = role, y = n)) +
     geom_bar(stat = "identity", fill = "steelblue") +
-  labs(x = "role", y = "Count", title = "Role(s) when working with SFARI pheno dataset (select all that apply)") +
+  labs(x = "Role (select all that apply)", y = "Count",) +
   theme_minimal() + 
   scale_x_discrete(
     labels = c(
@@ -247,18 +259,22 @@ barplot_data_roles <- survey %>%
     )) +
   geom_text(aes(label = paste0(round(pct, 1), "%")),
               position = position_dodge(width = 0.9),
-              vjust = -0.3, size = 3.5) +
+              vjust = -0.3, size = 7) +
   theme(
-    axis.text.x = element_text(angle = 55, hjust = 1, size = 12),
-    axis.text.y = element_text(size = 12)
+    text = element_text(color = "black", size = 20),
+    axis.text.x = element_text(angle = 40, hjust = 1, size = 18, colour = "black"),
+    axis.text.y = element_text(size = 18, colour = "black")
   )
 
 barplot_data_roles
+#ggsave2("figs/sample_data_roles.png")
+ggsave("figs/sample_data_roles.png", width = 17, height = 8, bg = "white", dpi = 300)
 
 # number of pheno datasets ----
 
 ## TO DO: remake with GGPLOT, fix axis labels 
 barplot(table(survey$n_pheno_datasets), main = "Prior to working with SFARI phenotypic data,\n how many other phenotypic datasets\n had you worked with?", ylab = "Count", xlab = "Number of datasets")
+ggsave2("figs/sample_n_datasets.png")
 
 ```
 
@@ -305,6 +321,7 @@ create_plot(
     "I did not notice this issue/this wasn't an issue with the dataset"
   )
 )
+ggsave2("figs/challenge_metadata.png")
 
 ## Data label and values
 data_vars <- grep("^datachal", names(survey), value = TRUE)
@@ -320,6 +337,7 @@ create_plot(
     "I did not notice this issue/this wasn't an issue with the dataset"
   )
 )
+ggsave2("figs/challenge_label_value.png")
 
 ## Data Combining 
 combine_vars <- grep("^combinechal", names(survey), value = TRUE)
@@ -336,6 +354,7 @@ create_plot(
     "NA - have not merged/combined datasets"
   )
 )
+ggsave2("figs/challenge_combine.png")
 
 ## Data Processing and Analysis Challenges
 procchal_vars <- grep("^procchal", names(survey), value = TRUE)
@@ -350,18 +369,19 @@ create_plot(
     "I noticed this but it wasn't an issue for me",
     "I did not notice this issue/this wasn't an issue with the dataset")
 )
-
+ggsave2("figs/challenge_proc_analysis.png")
 ```
 
 ```{r barrier plots}
 barrier_vars <- c("barrier_modifying_var", "barrier_combining_data", "barrier_interpreting")
 create_plot(survey,
             barrier_vars,
-            "Data Processing and Analysis Challenge",
+            "Barrier",
             metadata = metadata,
             response_to_sort = "This was a barrier I faced",
             response_order = c("This was a barrier I faced", "This was not a barrier I faced")
 )
+ggsave2("figs/barrier.png")
 ```
 
 ```{r free text}
@@ -381,14 +401,15 @@ create_plot(
   supp_vars,
   "Supplemental Features",
   metadata = metadata,
-  response_to_sort = "Very helpful",
+#  response_to_sort = "Very helpful",
   response_order = c("I didn't know this existed",
                      "I knew this existed but didn't use it",
                      "Unhelpful",
                      "Somewhat helpful",
-                     "Very helpful")
+                     "Very helpful"),
+  variable_order = c("supp_dd", "supp_releasenotes", "supp_welcomepacket", "supp_flags")
 )
-
+ggsave2("figs/existing_supp.png")
 
 useful_vars <- c("useful_code", "useful_softwaretips", "useful_analytic_guidance", "useful_integration_tools", "useful_data_mapping", "useful_data_explore_viz", "useful_standardized_varname", "useful_standardized_coding")
 
@@ -423,5 +444,6 @@ create_plot(
   response_order = c("Somewhat or very useful", "Not applicable or useful")
 )
 
+ggsave2("figs/potential_supp.png")
 
 ```
