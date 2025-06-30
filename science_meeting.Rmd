@@ -104,14 +104,36 @@ create_plot <- function(df, plot_variables, x_title, metadata, plot_na = FALSE, 
     group_by(Question) %>%
     mutate(pct = n / sum(n) * 100)
 
-  # Create grouped bar chart -- plot n but print %
-  plot <- ggplot(data_summary, aes(x = Question, y = n, fill = Response)) +
-    geom_bar(stat = "identity", position = position_dodge(width = 0.9)) +
-    geom_text(aes(label = paste0(round(pct, 1), "%")),
-              position = position_dodge(width = 0.9),
-              vjust = -0.3, size = 5) +
-    # scale_fill_brewer(palette = "Dark2", na.value = "grey80") +
-    labs(y = "Count of Responses", x = x_title) +
+  
+  totals <- data_summary %>%
+    group_by(Question) %>%
+    summarise(total_n = sum(n))
+
+    # note: the final color will be at the bottom
+   if (length(unique(data_summary$Response)) == 5) {
+            ### update this color scheme 
+           color_vector = c("pink", "blue", "#7570b3", "#1b9e77", "#d95f02")
+   } else if (length(unique(data_summary$Response)) == 4) {
+           color_vector = c("darkslategrey", "#1b9e77", "#7570b3", "#d95f02")
+   } else if (length(unique(data_summary$Response)) == 3) {
+           color_vector = c("#1b9e77", "#7570b3", "#d95f02")
+   } else if (length(unique(data_summary$Response)) == 2) {
+           color_vector = c("#1b9e77", "#d95f02")
+   }
+
+  # Create stacked bar chart -- plot %, print total N on top
+  plot <-
+    ggplot(data_summary, aes(x = Question, y = n, fill = Response)) +
+    geom_bar(stat = "identity", position = "fill") +  # stacked proportion bars
+    # Add total N at top of each bar
+    geom_text(
+      data = totals,
+      aes(x = Question, y = 1.05, label = paste0("n = ", total_n)),
+      inherit.aes = FALSE,
+      size = 5
+    ) +
+    scale_fill_manual(values = color_vector) +
+    labs(y = "Proportion of Responses", x = x_title) +
     theme_bw() +
     theme(
       plot.background = element_rect(
@@ -203,6 +225,12 @@ role_tree_map
 ```{r pheno dataset experience}
 
 # bar plot: which SFARI datasets ----
+sfari_datasets_count <- survey %>%
+  select(starts_with("worked_with")) %>%
+  mutate(n_worked_with = rowSums(select(., starts_with("worked_with")) == "yes")) 
+
+barplot(table(sfari_datasets_count$n_worked_with), main = "Number of SFARI pheno studies* worked with", ylab = "Count", xlab = "Number of datasets")
+
 sfari_datasets_plot <- survey %>%
   select(starts_with("worked_with")) %>%
   pivot_longer(cols = everything(), names_to = "study", values_to = "selected") %>%
@@ -316,9 +344,9 @@ create_plot(
   metadata = metadata,
   response_to_sort = "This caused challenges for me",
   response_order = c(
-    "This caused challenges for me",
+    "I did not notice this issue/this wasn't an issue with the dataset",
     "I noticed this but it wasn't an issue for me",
-    "I did not notice this issue/this wasn't an issue with the dataset"
+    "This caused challenges for me"
   )
 )
 ggsave2("figs/challenge_metadata.png")
@@ -332,9 +360,9 @@ create_plot(
   metadata = metadata,
   response_to_sort = "This caused challenges for me",
   response_order = c(
-    "This caused challenges for me",
+    "I did not notice this issue/this wasn't an issue with the dataset",
     "I noticed this but it didn't cause a challenge for me",
-    "I did not notice this issue/this wasn't an issue with the dataset"
+    "This caused challenges for me"
   )
 )
 ggsave2("figs/challenge_label_value.png")
@@ -348,10 +376,10 @@ create_plot(
   metadata = metadata,
   response_to_sort = "This caused challenges for me",
   response_order = c(
-    "This caused challenges for me",
-    "I noticed this but it wasn't an issue for me",
+    "NA - have not merged/combined datasets",
     "I did not notice this issue/this wasn't an issue with the dataset",
-    "NA - have not merged/combined datasets"
+    "I noticed this but it wasn't an issue for me",
+    "This caused challenges for me"
   )
 )
 ggsave2("figs/challenge_combine.png")
@@ -365,9 +393,9 @@ create_plot(
   metadata = metadata,
   response_to_sort = "This caused challenges for me",
   response_order = c(
-    "This caused challenges for me",
+    "I did not notice this issue/this wasn't an issue with the dataset",
     "I noticed this but it wasn't an issue for me",
-    "I did not notice this issue/this wasn't an issue with the dataset")
+    "This caused challenges for me")
 )
 ggsave2("figs/challenge_proc_analysis.png")
 ```
@@ -379,7 +407,7 @@ create_plot(survey,
             "Barrier",
             metadata = metadata,
             response_to_sort = "This was a barrier I faced",
-            response_order = c("This was a barrier I faced", "This was not a barrier I faced")
+            response_order = c("This was not a barrier I faced", "This was a barrier I faced")
 )
 ggsave2("figs/barrier.png")
 ```
@@ -391,6 +419,9 @@ challenge_text <- as.data.frame(survey$challenge_other_describe[!is.na(survey$ch
 barrier_text <- as.data.frame(survey$barrier_other_describe[!is.na(survey$barrier_other_describe)])
 
 best_repo_text <- as.data.frame(survey$best_repo_describe[!is.na(survey$best_repo_describe)])
+
+validity_text <- as.data.frame(survey$flags_describe[!is.na(survey$flags_describe)])
+
 ```
 
 # Supplemental Features
@@ -401,14 +432,22 @@ create_plot(
   supp_vars,
   "Supplemental Features",
   metadata = metadata,
-#  response_to_sort = "Very helpful",
-  response_order = c("I didn't know this existed",
-                     "I knew this existed but didn't use it",
-                     "Unhelpful",
-                     "Somewhat helpful",
-                     "Very helpful"),
-  variable_order = c("supp_dd", "supp_releasenotes", "supp_welcomepacket", "supp_flags")
-)
+  #  response_to_sort = "Very helpful",
+  response_order = c(
+    "I didn't know this existed",
+    "I knew this existed but didn't use it",
+    "Unhelpful",
+    "Somewhat helpful",
+    "Very helpful"
+  ),
+  variable_order = c(
+    "supp_dd",
+    "supp_releasenotes",
+    "supp_welcomepacket",
+    "supp_flags"
+  )
+) + scale_fill_manual(values = c("pink", "blue", "#d95f02", "aquamarine3", "#1b9e77")) # change color scheme
+
 ggsave2("figs/existing_supp.png")
 
 useful_vars <- c("useful_code", "useful_softwaretips", "useful_analytic_guidance", "useful_integration_tools", "useful_data_mapping", "useful_data_explore_viz", "useful_standardized_varname", "useful_standardized_coding")
@@ -443,7 +482,32 @@ create_plot(
   response_to_sort = "Somewhat or very useful",
   response_order = c("Somewhat or very useful", "Not applicable or useful")
 )
+ggsave2("figs/potential_supp_2cat.png")
 
-ggsave2("figs/potential_supp.png")
+create_plot(
+  survey,
+  useful_vars,
+  "Potential feature",
+  metadata = metadata_rev,
+  response_to_sort = "Very useful",
+  response_order = c(
+    "Not applicable to my research",
+    "Not useful",
+    "Somewhat useful",
+    "Very useful"
+  )
+) + scale_fill_manual(values = c("darkslategrey", "#d95f02", "aquamarine3", "#1b9e77")) # change color scheme
+
+ggsave2("figs/potential_supp_4cat.png")
+
+```
+
+# Deeper investigation
+```{r }
+# of those that didnt know about the welcome packet - what studies have they worked with?
+
+no_welc <- survey[survey$supp_welcomepacket == "I didn't know this existed" & !is.na(survey$supp_welcomepacket), grep("^worked_with", names(survey))]
+
+helpful_welc <- survey[survey$supp_welcomepacket == "Very helpful" & !is.na(survey$supp_welcomepacket), grep("^worked_with", names(survey))]
 
 ```
