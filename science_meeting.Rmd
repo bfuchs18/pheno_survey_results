@@ -175,16 +175,23 @@ table1(
 # bar plot: degree field ----
 degree_field_plot <- survey %>%
   count(degree_field_cleaned) %>% # count occurrences
-  ggplot(aes(x = reorder(degree_field_cleaned,-n), y = n)) + # reorder factor by count descending
-  geom_bar(stat = "identity", fill = "steelblue") +
+  mutate(degree_field_cleaned = ifelse(is.na(degree_field_cleaned), "Missing", degree_field_cleaned)) %>%
+  mutate(
+    degree_field_cleaned = fct_reorder(degree_field_cleaned, n, .desc = TRUE)
+  ) %>%
+  mutate(
+    degree_field_cleaned = fct_relevel(degree_field_cleaned, "Missing", after = Inf)
+  ) %>%
+  ggplot(aes(x = degree_field_cleaned, y = n)) +
+  geom_bar(stat = "identity", fill = "grey", color = "black") +
   labs(x = "Degree Field",
        y = "Count") +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = 55, hjust = 1, size = 12),
-        axis.text.y = element_text(size = 12))
+  theme(axis.text.x = element_text(angle = 55, hjust = 1, size = 12, color = "black"),
+        axis.text.y = element_text(size = 12, color = "black"))
 
 degree_field_plot
-ggsave2("figs/sample_field.png")
+ggsave("figs/sample_field.png", width = 17, height = 5, bg = "white", dpi = 300)
 
 
 
@@ -225,12 +232,6 @@ role_tree_map
 ```{r pheno dataset experience}
 
 # bar plot: which SFARI datasets ----
-sfari_datasets_count <- survey %>%
-  select(starts_with("worked_with")) %>%
-  mutate(n_worked_with = rowSums(select(., starts_with("worked_with")) == "yes")) 
-
-barplot(table(sfari_datasets_count$n_worked_with), main = "Number of SFARI pheno studies* worked with", ylab = "Count", xlab = "Number of datasets")
-
 sfari_datasets_plot <- survey %>%
   select(starts_with("worked_with")) %>%
   pivot_longer(cols = everything(), names_to = "study", values_to = "selected") %>%
@@ -239,7 +240,7 @@ sfari_datasets_plot <- survey %>%
   mutate(study = fct_reorder(study, n, .desc = TRUE),
          pct = n/nrow(survey) * 100) %>%
   ggplot(., aes(x = study, y = n)) +
-    geom_bar(stat = "identity", fill = "steelblue") +
+    geom_bar(stat = "identity", fill = "grey", color = "black") +
   labs(x = "Study (select all that apply)", y = "Count") +
   theme_minimal() + 
   scale_x_discrete(labels = c(
@@ -261,8 +262,28 @@ sfari_datasets_plot <- survey %>%
 sfari_datasets_plot
 ggsave2("figs/sample_datasets.png")
 
+
+# bar plot: n SFARI datasets endorsed ----
+sfari_datasets_count <- survey %>%
+  select(starts_with("worked_with")) %>%
+  mutate(n_worked_with = rowSums(select(., starts_with("worked_with")) == "yes")) %>% 
+  count(n_worked_with) %>% 
+  mutate(pct = n/nrow(survey) * 100) %>%
+  ggplot(., aes(x = n_worked_with, y = n)) +
+    geom_bar(stat = "identity", fill = "grey", color = "black") +
+  labs(x = "Number of SFARI pheno studies* worked with", y = "Count") +
+  theme_minimal() + 
+  geom_text(aes(label = paste0(round(pct, 1), "%")),
+              position = position_dodge(width = 0.9),
+              vjust = -0.3, size = 7) +
+  theme(
+    text = element_text(color = "black", size = 20),
+    axis.text.x = element_text(size = 18, colour = "black"),
+    axis.text.y = element_text(size = 18, colour = "black")
+  )
+ggsave("figs/n_sfari_datasets.png", width = 8, height = 6.2, bg = "white", dpi = 300)
+
 # roles with SFARI pheno datasets ----
-## TO DO: add pct 
 role_items <- grep("pheno_roles_", names(survey), value = TRUE)
 
 barplot_data_roles <- survey %>%
@@ -273,7 +294,7 @@ barplot_data_roles <- survey %>%
   mutate(role = fct_reorder(role, n, .desc = TRUE),
          pct = n/nrow(survey) * 100) %>%
   ggplot(., aes(x = role, y = n)) +
-    geom_bar(stat = "identity", fill = "steelblue") +
+    geom_bar(stat = "identity", fill = "grey", color = "black") +
   labs(x = "Role (select all that apply)", y = "Count",) +
   theme_minimal() + 
   scale_x_discrete(
@@ -295,14 +316,26 @@ barplot_data_roles <- survey %>%
   )
 
 barplot_data_roles
-#ggsave2("figs/sample_data_roles.png")
-ggsave("figs/sample_data_roles.png", width = 17, height = 8, bg = "white", dpi = 300)
+ggsave("figs/sample_data_roles.png", width = 22, height = 10, bg = "white", dpi = 300)
 
 # number of pheno datasets ----
 
-## TO DO: remake with GGPLOT, fix axis labels 
-barplot(table(survey$n_pheno_datasets), main = "Prior to working with SFARI phenotypic data,\n how many other phenotypic datasets\n had you worked with?", ylab = "Count", xlab = "Number of datasets")
-ggsave2("figs/sample_n_datasets.png")
+barplot_n_presfari <- survey %>%
+  count(n_pheno_datasets) %>%
+  mutate(pct = n/nrow(survey) * 100) %>%
+  ggplot(., aes(x = n_pheno_datasets, y = n)) +
+    geom_bar(stat = "identity", fill = "grey", color = "black") +
+  labs(x = "Number of phenotypic datasets worked with prior to working with SFARI phenotypic data", y = "Count",) +
+  theme_minimal() + 
+  geom_text(aes(label = paste0(round(pct, 1), "%")),
+              position = position_dodge(width = 0.9),
+              vjust = -0.3, size = 7) +
+  theme(
+    text = element_text(color = "black", size = 20),
+    axis.text.x = element_text(angle = 40, hjust = 1, size = 18, colour = "black"),
+    axis.text.y = element_text(size = 18, colour = "black")
+  )
+ggsave2("figs/sample_n_datasets_presfari.png")
 
 ```
 
@@ -324,10 +357,11 @@ create_plot(
   plot_variables = combining_data_vars,
   metadata = metadata,
   x_title = "Combination", 
-  response_order = c("Yes", "No, but I would like to", "No, and I don't plan to", "I tried to and it didn't work"), 
+  response_order = c("No, and I don't plan to", "I tried to and it didn't work", "No, but I would like to", "Yes"), 
   variable_order = combining_data_vars
 
-)
+) + scale_fill_manual(values = c("darkslategrey", "#d95f02", "#7570b3", "#1b9e77")) # change color scheme
+ggsave2("figs/combine_data.png")
 
 ```
 
